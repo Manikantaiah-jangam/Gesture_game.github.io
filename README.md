@@ -1,4 +1,4 @@
-# Gesture_game
+# Gesture_game.py
 Mini AI project: Gesture controlled game using OpenCV and PyGame
 #  Gesture Controlled Car Game
 
