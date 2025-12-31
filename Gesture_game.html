@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Gesture Controlled Car Game</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      border: 2px solid white;
+      background: black;
+    }
+  </style>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+</head>
+<body>
+
+<canvas id="game" width="700" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const screenWidth = canvas.width;
+const screenHeight = canvas.height;
+
+let gestureX = screenWidth / 2;
+let score = 0;
+let level = 1;
+let levelThreshold = 10;
+let obstacleSpeed = 6;
+let roadY = 0;
+
+const player = { x: 320, y: 380, w: 60, h: 100 };
+let obstacles = [
+  { x: Math.random()*640, y: -200, w: 60, h: 100 }
+];
+
+const roadImg = new Image();
+roadImg.src = "assets/road.png";
+
+const carImg = new Image();
+carImg.src = "assets/car.png";
+
+const obstacleImg = new Image();
+obstacleImg.src = "assets/obstacle.png";
+
+// ========= HAND TRACKING =========
+const video = document.createElement("video");
+video.style.display = "none";
+document.body.appendChild(video);
+
+const hands = new Hands({
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+
+hands.onResults(results => {
+  if (!results.multiHandLandmarks.length) return;
+  const x = results.multiHandLandmarks[0][8].x; // index finger tip
+  gestureX = x * screenWidth;
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => { await hands.send({image: video}); },
+  width: 640,
+  height: 480
+});
+camera.start();
+
+// ========= GAME LOOP =========
+function loop(){
+  ctx.clearRect(0,0,screenWidth,screenHeight);
+
+  // road scroll
+  roadY += 5;
+  if (roadY >= screenHeight) roadY = 0;
+
+  ctx.drawImage(roadImg,0,roadY-screenHeight,screenWidth,screenHeight);
+  ctx.drawImage(roadImg,0,roadY,screenWidth,screenHeight);
+
+  // move player
+  player.x = (gestureX / 640) * screenWidth - player.w/2;
+  player.x = Math.max(0, Math.min(screenWidth-player.w, player.x));
+
+  ctx.drawImage(carImg, player.x, player.y, player.w, player.h);
+
+  // obstacles
+  obstacles.forEach(o=>{
+    o.y += obstacleSpeed;
+    if (o.y > screenHeight){
+      o.y = -150;
+      o.x = Math.random()*(screenWidth-o.w);
+      score++;
+    }
+
+    ctx.drawImage(obstacleImg,o.x,o.y,o.w,o.h);
+
+    // collision
+    if (player.x < o.x+o.w && player.x+player.w > o.x &&
+        player.y < o.y+o.h && player.y+player.h > o.y){
+      alert("Game Over! Score: "+score);
+      document.location.reload();
+    }
+  });
+
+  // level + difficulty
+  level = Math.floor(score/levelThreshold)+1;
+  obstacleSpeed = 5 + level;
+
+  while(obstacles.length < level+1){
+    obstacles.push({
+      x: Math.random()*(screenWidth-60),
+      y: Math.random()*-400,
+      w: 60, h: 100
+    });
+  }
+
+  // HUD
+  ctx.fillStyle="white";
+  ctx.fillText("Score: "+score,10,30);
+  ctx.fillText("Level: "+level,10,55);
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
